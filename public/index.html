@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Instagram Spam Bot Dashboard</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 20px; background: #f4f4f4; }
+    .container { max-width: 800px; margin: auto; background: white; padding: 20px; border-radius: 10px; box-shadow: 0 0 10px rgba(0,0,0,0.1); }
+    h1 { color: #333; }
+    label { font-weight: bold; display: block; margin-top: 10px; }
+    input, textarea { width: 100%; padding: 8px; margin-top: 5px; border: 1px solid #ddd; border-radius: 5px; }
+    button { margin-top: 15px; padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    button.stop { background: #f44336; }
+    #logs { margin-top: 20px; background: #222; color: #0f0; padding: 10px; height: 300px; overflow-y: auto; font-family: monospace; font-size: 12px; }
+    .status { margin-top: 10px; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ Instagram Spam Bot</h1>
+    <div class="status" id="status">Status: Idle</div>
+
+    <label>Session ID:</label>
+    <input type="text" id="sessionId" placeholder="Enter sessionid">
+
+    <label>CSRF Token:</label>
+    <input type="text" id="csrfToken" placeholder="Enter csrftoken">
+
+    <label>Group URL:</label>
+    <input type="text" id="groupUrl" placeholder="https://www.instagram.com/direct/t/123456789/">
+
+    <label>Messages (comma separated):</label>
+    <textarea id="messages" rows="3" placeholder="msg1, msg2, msg3"></textarea>
+
+    <label>Group Names for rename (optional, comma separated):</label>
+    <input type="text" id="ncNames" placeholder="Name1, Name2">
+
+    <label>Delay (ms):</label>
+    <input type="number" id="delayMs" value="500">
+
+    <label>Cycles (0 = infinite):</label>
+    <input type="number" id="cycles" value="0">
+
+    <button id="startBtn">Start Spam</button>
+    <button id="stopBtn" class="stop" style="display:none;">Stop Spam</button>
+
+    <div id="logs"></div>
+  </div>
+
+  <script>
+    const logsDiv = document.getElementById('logs');
+    const statusDiv = document.getElementById('status');
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+
+    function addLog(message) {
+      const div = document.createElement('div');
+      div.textContent = message;
+      logsDiv.appendChild(div);
+      logsDiv.scrollTop = logsDiv.scrollHeight;
+    }
+
+    async function fetchStatus() {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      statusDiv.textContent = data.running ? 'Status: Running' : 'Status: Idle';
+      if (data.running) {
+        startBtn.style.display = 'none';
+        stopBtn.style.display = 'inline-block';
+      } else {
+        startBtn.style.display = 'inline-block';
+        stopBtn.style.display = 'none';
+      }
+      // Update logs only if changed
+      if (JSON.stringify(data.logs) !== logsDiv.dataset.logs) {
+        logsDiv.dataset.logs = JSON.stringify(data.logs);
+        logsDiv.innerHTML = '';
+        data.logs.forEach(log => addLog(log));
+      }
+    }
+
+    setInterval(fetchStatus, 2000);
+
+    startBtn.addEventListener('click', async () => {
+      const messages = document.getElementById('messages').value.split(',').map(m => m.trim()).filter(Boolean);
+      const ncNames = document.getElementById('ncNames').value.split(',').map(n => n.trim()).filter(Boolean);
+      const payload = {
+        sessionId: document.getElementById('sessionId').value.trim(),
+        csrfToken: document.getElementById('csrfToken').value.trim(),
+        groupUrl: document.getElementById('groupUrl').value.trim(),
+        messages: messages,
+        ncNames: ncNames,
+        delayMs: parseInt(document.getElementById('delayMs').value) || 500,
+        cycles: parseInt(document.getElementById('cycles').value) || 0
+      };
+
+      const res = await fetch('/api/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(data.error);
+      }
+    });
+
+    stopBtn.addEventListener('click', async () => {
+      await fetch('/api/stop', { method: 'POST' });
+    });
+  </script>
+</body>
+</html>
